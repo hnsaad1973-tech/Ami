@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="AMI" />
+<title>AMI — Chairman Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#08080D; --bg2:#0B0C12; --panel:#0F1118; --panel2:#12141C; --line:#262834; --linegold:#3A3320;
+    --ink:#EDEAE2; --muted:#8C8F9A; --gold:#C9A24B; --gold2:#E0C079; --goldfill:#C6A14C;
+    --green:#5BCB8B; --red:#F0565B; --blue:#5B9BD5; --amber:#D9A441; --purple:#A56BE0;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;-webkit-text-size-adjust:100%}
+  ::selection{background:var(--gold);color:#000}
+  .serif{font-family:"Playfair Display",Georgia,serif}
+  .mono{font-family:"JetBrains Mono",monospace}
+  button{font-family:inherit;cursor:pointer;color:inherit}
+  input{font-family:inherit}
+  .cap{letter-spacing:.18em;text-transform:uppercase}
+  .gold{color:var(--gold)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:4px}
+  .dot{height:8px;width:8px;border-radius:50%;display:inline-block;vertical-align:middle}
+  svg{display:block}
+  @keyframes pl{0%,100%{opacity:1}50%{opacity:.4}}
+  .blink{animation:pl 1.6s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){.blink{animation:none}}
+
+  .top{display:flex;align-items:center;gap:10px;padding:14px 16px 8px;padding-top:max(14px,env(safe-area-inset-top))}
+  .brand{display:flex;align-items:center;gap:7px;color:var(--gold)}
+  .brand .cap{font-size:13px;font-weight:600}
+  .badge{border:1px solid;border-radius:3px;padding:3px 8px;font-size:11px;font-weight:600;letter-spacing:.12em;display:inline-flex;align-items:center;gap:6px}
+  .b-alert{color:var(--red);border-color:var(--red)}
+  .b-nominal{color:var(--green);border-color:var(--green)}
+  .b-live{color:var(--green);border-color:var(--green)}
+  .b-degraded{color:var(--amber);border-color:var(--amber)}
+  .clock{margin-left:auto;color:var(--muted);font-size:12px}
+  .gear{background:none;border:none;color:var(--muted);font-size:17px;padding:4px}
+
+  .wrap{padding:4px 16px 48px;max-width:680px;margin:0 auto}
+  .eyebrow{color:var(--gold);font-size:12px;font-weight:600;margin:14px 0 2px}
+  h1.big{font-size:34px;margin:0 0 4px;font-weight:600;line-height:1.05}
+  .rule{height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:.5;margin:8px auto;width:200px}
+
+  .switch{display:flex;gap:8px;overflow-x:auto;padding:12px 0 4px;-webkit-overflow-scrolling:touch}
+  .switch::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:7px 13px;font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+  .chip.on{color:var(--ink)}
+
+  .card{border:1px solid var(--line);border-radius:5px;background:var(--panel);margin-top:14px}
+  .card .pad{padding:16px}
+  .between{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .btn-line{border:1px solid var(--gold);color:var(--gold);background:none;border-radius:3px;padding:8px 14px;font-size:12px;font-weight:600;letter-spacing:.14em}
+  .btn-gold{background:var(--goldfill);color:#0a0a0a;border:none;border-radius:3px;padding:12px 16px;font-weight:700;letter-spacing:.12em;font-size:13px;display:flex;align-items:center;justify-content:center;gap:10px;width:100%}
+  .divider{height:1px;background:var(--line)}
+  .muted{color:var(--muted)}
+  .small{font-size:13px}
+  .xs{font-size:11px}
+
+  .enter{margin-top:16px;border:1px solid var(--linegold);border-radius:6px;padding:20px 18px;background:
+     radial-gradient(120% 140% at 0% 0%, rgba(201,162,75,.16), transparent 55%), var(--panel);
+     display:flex;align-items:center;gap:16px}
+  .enter .sq{width:60px;height:60px;border:1px solid var(--gold);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--gold);flex:0 0 auto}
+  .enter .arrow{margin-left:auto;color:var(--gold)}
+
+  .toggle{width:54px;height:30px;border:1px solid var(--line);border-radius:4px;background:var(--panel2);position:relative;flex:0 0 auto}
+  .toggle .knob{position:absolute;top:3px;left:3px;width:22px;height:22px;background:#EDEAE2;border-radius:2px;transition:.2s}
+  .toggle.on{border-color:var(--green)}
+  .toggle.on .knob{left:27px;background:var(--green)}
+
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+  .tile{border:1px solid var(--line);border-radius:4px;background:var(--panel);padding:18px 8px;display:flex;flex-direction:column;align-items:center;gap:12px;color:var(--ink)}
+  .tile .ti{color:var(--gold)}
+  .tile .tl{font-size:12px;font-weight:600;letter-spacing:.1em}
+
+  .sec{margin-top:16px;border:1px solid var(--line);border-radius:5px}
+  .sec .head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .sec .head .gold{font-size:12px;font-weight:600;letter-spacing:.14em}
+  .sec .head .right{margin-left:auto;color:var(--muted);font-size:11px;letter-spacing:.12em}
+  .sec .body{padding:16px}
+
+  .cashrow{padding:16px;border-bottom:1px solid var(--line)}
+  .cashrow:last-child{border-bottom:none}
+  .cashrow .k{font-size:11px;letter-spacing:.12em;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .cashrow .v{font-family:"Playfair Display";font-size:30px;margin-top:6px}
+  .cashrow .s{font-size:11px;letter-spacing:.1em;color:var(--muted);margin-top:2px}
+
+  .occ-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px}
+  .occ{border:1px solid var(--line);border-radius:4px;padding:14px}
+  .occ .l{font-size:11px;letter-spacing:.1em;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .occ .n{font-family:"Playfair Display";font-size:26px;margin-top:8px}
+  .bar{height:8px;border:1px solid var(--line);border-radius:3px;margin:0 16px;overflow:hidden;background:var(--panel2)}
+  .bar > i{display:block;height:100%;background:var(--green)}
+
+  .vaults{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+  .vault{border:1px solid var(--line);border-radius:5px;padding:16px;display:flex;gap:12px;align-items:flex-start}
+  .vault .vi{width:46px;height:46px;border:1px solid var(--gold);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--gold);flex:0 0 auto}
+  .vault .vt{font-weight:600;letter-spacing:.08em;font-size:14px}
+  .vault .vs{font-size:11px;letter-spacing:.1em;color:var(--muted);margin-top:4px}
+
+  .feedline{padding:14px 16px;border-bottom:1px solid var(--line)}
+  .feedline:last-child{border-bottom:none}
+  .feedhead{font-size:12px;letter-spacing:.1em;display:flex;gap:10px;align-items:center}
+  .feedmsg{margin-top:5px;font-size:15px}
+  .wa-on{margin:16px;border:1px solid var(--green);border-radius:4px;color:var(--green);text-align:center;padding:14px;font-weight:600;letter-spacing:.14em;font-size:13px;display:flex;align-items:center;justify-content:center;gap:10px}
+
+  .act{display:flex;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line);align-items:flex-start}
+  .act:last-child{border-bottom:none}
+  .act .t{font-size:12px;color:var(--muted);width:50px;flex:0 0 auto}
+  .act .tag{border:1px solid var(--gold);color:var(--gold);font-size:10px;letter-spacing:.1em;padding:3px 7px;border-radius:3px;flex:0 0 auto}
+  .act .m{font-size:14px}
+
+  .adv-in{display:flex;gap:8px;padding:16px}
+  .adv-in input{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:3px;color:var(--ink);padding:12px;outline:none;font-size:14px}
+  .icbtn{border:1px solid var(--line);background:var(--panel2);border-radius:3px;width:48px;display:flex;align-items:center;justify-content:center;color:var(--gold)}
+  .send{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:3px;padding:0 16px;font-weight:600;letter-spacing:.1em;font-size:12px}
+  .msgs{padding:0 16px 16px;display:flex;flex-direction:column;gap:10px;max-height:46vh;overflow-y:auto}
+  .bub{border-radius:8px;padding:9px 12px;font-size:14px;white-space:pre-wrap;line-height:1.5;max-width:90%}
+  .bub.me{align-self:flex-end;background:var(--panel2);border:1px solid var(--line)}
+  .bub.ai{align-self:flex-start;background:rgba(201,162,75,.1);border:1px solid rgba(201,162,75,.3)}
+
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;padding:18px;z-index:60}
+  .modal.show{display:flex}
+  .sheet{width:100%;max-width:420px;padding:22px;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+  .sheet label{display:block;font-size:12px;color:var(--muted);margin:14px 0 5px}
+  .sheet input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:10px 12px;outline:none;font-size:13px}
+  .primary{background:var(--goldfill);color:#0a0a0a;border:none;border-radius:4px;padding:12px;width:100%;font-weight:700;margin-top:18px;letter-spacing:.08em}
+  .ghost{background:none;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:9px;width:100%;margin-top:8px}
+  .note{font-size:12px;color:var(--muted);line-height:1.5}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--gold);color:var(--ink);padding:11px 16px;border-radius:6px;font-size:13px;z-index:70;display:none;max-width:90%}
+  .toast.show{display:block}
+
+  html[data-theme="day"]{
+    --bg:#E9E7DF;--bg2:#F2F0E9;--panel:#FBFAF5;--panel2:#F0EEE6;--line:#D8D4C8;--linegold:#C9B68A;
+    --ink:#1B1C22;--muted:#6B6E78;--gold:#8A6E29;--gold2:#A8862F;--goldfill:#C6A14C;
+    --green:#2E9D63;--red:#C73E43;--blue:#3A78B5;--amber:#B7841F;--purple:#7A45B0;
+  }
+  html[data-theme="day"] body{background:var(--bg)}
+  .top{flex-wrap:wrap}
+  .sys{display:flex;gap:14px;align-items:center;padding:7px 16px;margin:0 -16px 0 -16px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:10px;letter-spacing:.13em;color:var(--muted);overflow-x:auto;white-space:nowrap}
+  .sys::-webkit-scrollbar{display:none}
+  .sys span{display:inline-flex;align-items:center;gap:5px}
+  .sys .lt{height:7px;width:7px;border-radius:50%;flex:0 0 auto}
+  .comms{display:flex;gap:8px;padding:0 16px 14px;flex-wrap:wrap}
+  .comms button{font-size:11px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);border-radius:999px;padding:7px 12px;letter-spacing:.04em}
+  .comms button.wa{border-color:var(--green);color:var(--green)}
+  .comms button.em{border-color:var(--blue);color:var(--blue)}
+  .card,.sec,.tile,.occ,.vault,.panel{box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 1px 2px rgba(0,0,0,.25)}
+  html[data-theme="day"] .card,html[data-theme="day"] .sec,html[data-theme="day"] .tile,html[data-theme="day"] .occ,html[data-theme="day"] .vault,html[data-theme="day"] .panel{box-shadow:0 1px 2px rgba(0,0,0,.08)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div class="modal" id="settings">
+  <div class="sheet">
+    <div class="serif" style="font-size:20px">Connect AMI</div>
+    <p class="note" style="margin-top:6px">Stored only on this device. Your Anthropic key calls Claude directly from this page.</p>
+    <label>Supabase URL</label><input id="cfgUrl" placeholder="https://xxxx.supabase.co" />
+    <label>Supabase anon key</label><input id="cfgAnon" placeholder="eyJ..." />
+    <label>Anthropic API key</label><input id="cfgKey" placeholder="sk-ant-..." />
+    <label>Your WhatsApp number (intl, e.g. 231...)</label><input id="cfgWa" placeholder="231770022222" />
+    <label>Your email (for send-as)</label><input id="cfgEmail" placeholder="you@example.com" />
+    <button class="primary" data-act="save">Save &amp; connect</button>
+    <button class="ghost" data-act="closeSettings">Close</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const I=(p)=>`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const ICONS={
+  shield:I('<path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/>'),
+  swords:I('<path d="M14 4l6 6-3 3-6-6zM10 20l-6-6 3-3 6 6zM5 19l2-2M19 5l-2 2"/>'),
+  mic:I('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>'),
+  power:I('<path d="M12 4v8M7 7a7 7 0 1010 0"/>'),
+  doc:I('<path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8zM14 3v5h5"/>'),
+  printer:I('<path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M8 14h8v7H8z"/>'),
+  check:I('<circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>'),
+  wallet:I('<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12h3M3 9h13a2 2 0 012 2"/>'),
+  building:I('<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/>'),
+  scale:I('<path d="M12 3v18M5 8h14M5 8l-2 6h4zM19 8l-2 6h4zM8 21h8"/>'),
+  camera:I('<rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13" r="3.2"/><path d="M9 7l1.5-2h3L15 7"/>'),
+  spark:I('<path d="M12 4l1.5 4.5L18 10l-4.5 1.5L12 16l-1.5-4.5L6 10l4.5-1.5zM18 3v3M19.5 4.5h-3"/>'),
+  plane:I('<path d="M10 14L3 11l2-2 6 1 4-5 2 1-3 6 4 6-2 1-4-4-3 4-2-1z"/>'),
+  bell:I('<path d="M6 9a6 6 0 1112 0c0 5 2 6 2 6H4s2-1 2-6M10 20a2 2 0 004 0"/>'),
+  dollar:I('<circle cx="12" cy="12" r="9"/><path d="M12 7v10M14.5 9.5C14 8.5 13 8 12 8c-1.5 0-2.5 1-2.5 2s1 1.5 2.5 2 2.5 1 2.5 2-1 2-2.5 2c-1 0-2-.5-2.5-1.5"/>'),
+  people:I('<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20a6 6 0 0112 0M15 20a5 5 0 016-4.5"/>'),
+  chat:I('<path d="M4 5h16v11H9l-5 4z"/>'),
+  lock:I('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>'),
+  vault:I('<rect x="4" y="5" width="16" height="14" rx="1"/><path d="M8 9l8 6M16 9l-8 6"/>'),
+  target:I('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>'),
+  arrow:I('<path d="M5 12h14M13 6l6 6-6 6"/>'),
+  up:I('<path d="M7 17L17 7M9 7h8v8"/>'),
+  down:I('<path d="M7 7l10 10M15 17H7V9"/>'),
+};
+
+const COMPANIES=[
+  {key:"group",   name:"Group (all entities)",        short:"Group",             match:null,       accent:"var(--gold)"},
+  {key:"leone",   name:"Leone Investment Inc.",       short:"Leone Investment",  match:"leone",    accent:"var(--green)"},
+  {key:"cape",    name:"Cape Realities Liberia Ltd",  short:"Cape Realities",    match:"cape",     accent:"var(--gold)"},
+  {key:"lead",    name:"The Lead Hotel",              short:"The Lead Hotel",    match:"lead",     accent:"var(--purple)"},
+  {key:"platinum",name:"Platinum Insurance",          short:"Platinum Insurance",match:"platinum", accent:"var(--blue)"},
+];
+const ENTITY_KEYS=["leone","cape","lead","platinum"];
+const TABLES=["properties","units","tenants","bank_accounts","loans","receivables","payables"];
+const MODEL_FAST="claude-sonnet-4-6", MODEL_DEEP="claude-opus-4-8";
+
+const WA=[
+  {dir:"IN", t:"08:14", who:"HASHIM — OPS",  msg:"Pact warehouse generator serviced ✅"},
+  {dir:"OUT",t:"08:22", who:"CHAIRMAN",      msg:"Confirm rent received from UK Embassy"},
+  {dir:"IN", t:"08:31", who:"NOUR — FINANCE",msg:"Bank sweep posted, $412k balance"},
+  {dir:"OUT",t:"08:40", who:"CHAIRMAN",      msg:"Schedule inspection 13th St Sinkor"},
+];
+const FEED=[
+  {t:"08:42",tone:"green",tag:"TREASURY", m:"Daily bank sweep reconciled across 6 accounts."},
+  {t:"08:30",tone:"amber",tag:"APPROVALS",m:"2 capex items awaiting Chairman signature."},
+  {t:"07:55",tone:"amber",tag:"ASSETS",   m:"Tenant move-in scheduled — Tower A, Unit 1204."},
+  {t:"07:30",tone:"green",tag:"BRIEF",    m:"Chief of Staff morning brief generated."},
+  {t:"YEST", tone:"amber",tag:"LEGAL",    m:"Counsel uploaded revised lease addendum."},
+  {t:"YEST", tone:"red",  tag:"ALERTS",   m:"1 overdue receivable flagged — follow-up queued."},
+];
+const TILES=[["doc","BRIEFS"],["printer","REPORTS"],["check","APPROVALS"],["wallet","TREASURY"],["building","ASSETS"],["scale","LEGAL"],["shield","ADMIN"],["camera","CAPTURE"],["spark","ADVISOR"],["plane","COMMAND"],["bell","ALERTS"]];
+
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return (this._m[k]??d)}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){this._m[k]=v}},_m:{}};
+const state={view:"home",company:"group",cfg:store.get("ami_cfg",{url:"",anon:"",key:"",wa:"",email:""}),snap:emptySnap(),conv:store.get("ami_conv",[]),autopilot:false,brief:null,briefStatus:"idle",busy:false,clock:"",theme:store.get("ami_theme","night")};
+function emptySnap(){const s={};["leone","cape","lead","platinum"].forEach(k=>s[k]={entity:null,properties:[],units:[],tenants:[],bank_accounts:[],loans:[],receivables:[],payables:[]});return s}
+function money(n){return "$"+(Math.round((n||0)*100)/100).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
+function sum(rows,f){return (rows||[]).reduce((a,r)=>a+(Number(r&&r[f])||0),0)}
+function sb(){if(!state.cfg.url||!state.cfg.anon)return null;try{return window.supabase.createClient(state.cfg.url,state.cfg.anon)}catch(e){return null}}
+
+async function loadSnapshot(){
+  const db=sb(); if(!db)return;
+  let entities=[]; try{const r=await db.from("entities").select("*");entities=r.data||[]}catch(e){}
+  const id={}; ENTITY_KEYS.forEach(k=>{const c=COMPANIES.find(x=>x.key===k);const e=entities.find(x=>((x.name||"").toLowerCase()).includes(c.match));state.snap[k].entity=e||null;id[k]=e?e.id:null});
+  for(const t of TABLES){let rows=[];try{const r=await db.from(t).select("*");rows=r.data||[]}catch(e){}ENTITY_KEYS.forEach(k=>{state.snap[k][t]=id[k]?rows.filter(r=>r.entity_id===id[k]):[]})}
+}
+function scope(company){const c=company||state.company;const keys=c==="group"?ENTITY_KEYS:[c];const out={};TABLES.forEach(t=>out[t]=keys.flatMap(k=>state.snap[k][t]));return out}
+function within7(d){if(!d)return false;const diff=(new Date(d)-new Date())/86400000;return diff>=0&&diff<=7}
+function metrics(company){const s=scope(company);const u=s.units,st=x=>u.filter(r=>(r.status||"").toLowerCase()===x).length;
+  return{cash:sum(s.bank_accounts,"balance"),
+    incoming:s.receivables.filter(r=>within7(r.due_date)).reduce((a,r)=>a+(Number(r.amount)||0),0),
+    outgoing:s.payables.filter(r=>within7(r.due_date)).reduce((a,r)=>a+(Number(r.amount)||0),0),
+    units:u.length,occupied:st("occupied"),leased:st("leased"),active:st("active"),vacant:st("vacant"),pending:st("pending")}}
+
+const SYSTEM=`You are AMI (always pronounced "Ah-mee", never spelled out), AI Chief of Staff for Saad AI Ventures, run by the Chairman Hussein Saad. You act as CEO/CFO/CRO across four entities: Leone Investment Inc., Cape Realities Liberia Ltd, The Lead Hotel, Platinum Insurance. Be direct and executive; lead with the number then the implication; tight enough for a phone. Final approval on anything that moves money or sends external messages belongs to the Chairman.`;
+function aiContext(){const lines=ENTITY_KEYS.map(k=>{const c=COMPANIES.find(x=>x.key===k);const d=state.snap[k];
+  return `- ${c.name}: cash ${money(sum(d.bank_accounts,"balance"))}, receivables ${money(sum(d.receivables,"amount"))}, payables ${money(sum(d.payables,"amount"))}, ${d.units.length} units, ${d.tenants.length} tenants.`});
+  const where=state.view==="war"?"War Room (all four entities integrated)":`Command Center — ${COMPANIES.find(c=>c.key===state.company).name}`;
+  return `Viewing: ${where}.\nEntities:\n${lines.join("\n")}`}
+async function callClaude(messages,deep){
+  if(!state.cfg.key) throw new Error("Add your Anthropic key in settings (⚙).");
+  const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":state.cfg.key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:deep?MODEL_DEEP:MODEL_FAST,max_tokens:1400,system:SYSTEM+"\n\n## Live context\n"+aiContext(),messages})});
+  const data=await res.json(); if(data.error) throw new Error(data.error.message||"AI error");
+  return (data.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("\n")}
+async function generateBrief(){state.briefStatus="loading";render();
+  try{const txt=await callClaude([{role:"user",content:"Produce today's executive morning brief across all four entities: consolidated cash position, biggest receivables risk, payables due this week, and the 3 actions I should take today. 6 lines max."}],true);
+    state.brief={text:txt,time:new Date().toLocaleTimeString("en-GB",{hour12:false}).slice(0,5),ok:true};state.briefStatus="ok";}
+  catch(e){state.brief={text:e.message,time:new Date().toLocaleTimeString("en-GB",{hour12:false}).slice(0,5),ok:false};state.briefStatus="error";}
+  render()}
+function listen(){if(!state.brief||!state.brief.ok){toast("Generate a brief first");return}try{const u=new SpeechSynthesisUtterance(state.brief.text.replace(/AMI/g,"Ah-mee"));speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){toast("Voice not available")}}
+
+const app=document.getElementById("app");
+function esc(s){return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(toast._);toast._=setTimeout(()=>t.classList.remove("show"),2200)}
+function applyTheme(){document.documentElement.setAttribute("data-theme",state.theme==="day"?"day":"night")}
+function themeBtn(){return `<button class="gear" data-act="theme" title="Day / Night">${state.theme==="day"?"☀":"☾"}</button>`}
+function dashBtn(){return `<button class="btn-line" data-act="home" style="padding:6px 9px;font-size:11px;letter-spacing:.06em">⌂ DASH</button>`}
+function systemsStrip(){
+  const on=!!state.cfg.key, data=!!state.cfg.url;
+  const lt=c=>`<span class="lt" style="background:var(--${c})"></span>`;
+  return `<div class="sys">
+    <span>${lt("green")}SYS NOMINAL</span>
+    <span>${lt(data?"green":"amber")}DATA ${data?"LINK":"STANDBY"}</span>
+    <span>${lt(on?"green":"red")}AI ${on?"ONLINE":"OFFLINE"}</span>
+    <span>${lt("amber")}AUTOPILOT ${state.autopilot?"ENGAGED":"STANDBY"}</span>
+    <span>${lt(state.cfg.wa||state.cfg.email?"green":"amber")}COMMS ${state.cfg.wa||state.cfg.email?"READY":"SETUP"}</span>
+  </div>`;
+}
+function lastAI(){for(let i=state.conv.length-1;i>=0;i--)if(state.conv[i].role==="assistant")return state.conv[i].content;return ""}
+function sendVia(kind){
+  const t=lastAI(); if(!t){toast("Ask Claude to draft a message first");return}
+  if(kind==="wa"){const n=(state.cfg.wa||"").replace(/[^0-9]/g,"");location.href="whatsapp://send?"+(n?("phone="+n+"&"):"")+"text="+encodeURIComponent(t);}
+  else{location.href="mailto:"+(state.cfg.email||"")+"?subject="+encodeURIComponent("From AMI")+"&body="+encodeURIComponent(t);}
+}
+function switcher(){return `<div class="switch">`+COMPANIES.map(c=>`<button class="chip ${state.company===c.key?"on":""}" data-act="company" data-k="${c.key}" style="${state.company===c.key?`border-color:${c.accent}`:""}"><span class="dot" style="background:${c.accent}"></span>${c.short}</button>`).join("")+`</div>`}
+
+function tileEl(lab,val,sub,color){return `<div class="panel" style="padding:14px"><div class="xs cap muted">${lab}</div><div class="serif" style="font-size:24px;margin-top:4px;color:${color}">${val}</div><div class="xs muted" style="margin-top:3px">${sub}</div></div>`}
+
+function homeView(){
+  const g=metrics("group"); const on=!!state.cfg.key;
+  return `
+  <div class="top">
+    <span class="brand">${ICONS.shield}<span class="cap">AMI</span></span>
+    <span class="badge ${on?"b-nominal":"b-alert"}"><span class="dot blink" style="background:${on?"var(--green)":"var(--red)"}"></span>${on?"NOMINAL":"ALERT"}</span>
+    <span class="clock mono" id="clock">${state.clock}</span>
+    ${themeBtn()}
+    <button class="gear" data-act="settings">⚙</button>
+  </div>
+  <div class="wrap">
+    ${systemsStrip()}
+    <div style="text-align:center;margin-top:24px">
+      <div class="eyebrow cap" style="margin:0">Asset Management Innovations</div>
+      <div class="serif" style="font-size:60px;line-height:1;font-weight:700">AMI<span class="gold">.</span></div>
+      <div class="muted cap xs" style="margin-top:8px;letter-spacing:.34em">Chairman’s Operating System</div>
+      <div class="rule"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
+      ${tileEl("Group Cash",money(g.cash),"all entities","var(--green)")}
+      ${tileEl("Receivables",money(g.receivables),"open","var(--gold)")}
+      ${tileEl("Payables",money(g.payables),"open","var(--red)")}
+      ${tileEl("Units",String(g.units),"portfolio","var(--ink)")}
+    </div>
+
+    <button class="enter" data-act="command" style="width:100%;text-align:left;margin-top:16px">
+      <span class="sq">${ICONS.shield}</span>
+      <span><div class="gold cap xs">Open the</div><div class="serif" style="font-size:28px;line-height:1">Command Center</div><div class="muted cap xs" style="margin-top:6px">Brief · Autopilot · Activity</div></span>
+      <span class="arrow">${ICONS.arrow}</span>
+    </button>
+    <button class="enter" data-act="war" style="width:100%;text-align:left;margin-top:12px">
+      <span class="sq">${ICONS.swords}</span>
+      <span><div class="gold cap xs">Enter the</div><div class="serif" style="font-size:28px;line-height:1">War Room</div><div class="muted cap xs" style="margin-top:6px">Cash flow · Alerts · Approvals</div></span>
+      <span class="arrow">${ICONS.arrow}</span>
+    </button>
+
+    <div class="eyebrow cap" style="margin-top:22px">Companies</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px">
+      ${ENTITY_KEYS.map(k=>{const c=COMPANIES.find(x=>x.key===k);const f=metrics(k);
+        return `<button class="tile" data-act="gocompany" data-k="${k}" style="align-items:flex-start;padding:16px;gap:6px">
+          <span style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:${c.accent}"></span><span class="tl">${c.short}</span></span>
+          <span class="muted xs">Cash ${money(f.cash)}</span></button>`}).join("")}
+    </div>
+
+    <div class="card" style="border-color:var(--linegold)"><div class="pad">
+      <div class="gold cap xs">Add AMI to your iPhone</div>
+      <div class="muted small" style="margin-top:6px">In Safari, tap the Share icon then <b style="color:var(--ink)">Add to Home Screen</b> — AMI gets an app icon and opens full-screen.</div>
+    </div></div>
+  </div>`;
+}
+
+function commandView(){
+  const on=state.cfg.key && state.briefStatus!=="error";
+  const briefBadge=state.briefStatus==="error"?`<span class="badge b-degraded">DEGRADED</span>`:state.briefStatus==="loading"?`<span class="badge b-degraded">WORKING…</span>`:`<span class="badge b-nominal">NOMINAL</span>`;
+  const briefTitle=state.brief?(state.brief.ok?"Today’s brief ready":"Chief of Staff unreachable"):"No brief yet";
+  const briefBody=state.brief?esc(state.brief.text):"Tap RE-BRIEF to generate today’s brief from your live data.";
+  const briefTime=state.brief?state.brief.time:"—";
+  return `
+  <div class="top">
+    ${dashBtn()}
+    <span class="brand" data-act="home">${ICONS.shield}<span class="cap">AMI</span></span>
+    <span class="badge ${on?"b-nominal":"b-alert"}"><span class="dot blink" style="background:${on?"var(--green)":"var(--red)"}"></span>${on?"NOMINAL":"ALERT"}</span>
+    <span class="clock mono" id="clock">${state.clock}</span>
+    ${themeBtn()}
+    <button class="gear" data-act="settings">⚙</button>
+  </div>
+  <div class="wrap">
+    ${systemsStrip()}
+    <div class="eyebrow cap">Asset Management Innovations</div>
+    <h1 class="big serif">Chairman Command Center</h1>
+    ${switcher()}
+    <div class="card"><div class="pad">
+      <div class="between">
+        <span class="gold cap" style="font-size:12px;font-weight:600"><span class="dot" style="background:var(--gold)"></span>&nbsp; Chief of Staff · ${on?"Online":"Offline"}</span>
+        <button class="btn-line" data-act="brief">RE-BRIEF</button>
+      </div>
+      <button class="btn-gold" style="margin-top:14px" data-act="listen">${ICONS.mic} LISTEN TO BRIEF</button>
+    </div>
+    <div class="divider"></div>
+    <div class="pad">
+      <div class="between"><span class="gold cap xs">Today’s brief · ${briefTime}</span>${briefBadge}</div>
+      <div style="font-size:19px;margin-top:8px">${briefTitle}</div>
+      <div class="muted small" style="margin-top:6px;white-space:pre-wrap">${briefBody}</div>
+    </div></div>
+    <button class="enter" data-act="war" style="width:100%;text-align:left">
+      <span class="sq">${ICONS.swords}</span>
+      <span><div class="gold cap xs">Enter the</div><div class="serif" style="font-size:30px;line-height:1">War Room</div><div class="muted cap xs" style="margin-top:6px">Cash flow · Critical alerts · Approvals</div></span>
+      <span class="arrow">${ICONS.arrow}</span>
+    </button>
+    <div class="card"><div class="pad between">
+      <span style="display:flex;gap:14px;align-items:center">
+        <span style="width:46px;height:46px;border:1px solid var(--gold);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--gold)">${ICONS.power}</span>
+        <span><div class="gold cap" style="font-size:12px;font-weight:600">Autopilot</div><div class="muted small" style="margin-top:4px">Standby — Chairman approval required for all actions.</div></span>
+      </span>
+      <button class="toggle ${state.autopilot?"on":""}" data-act="autopilot"><span class="knob"></span></button>
+    </div></div>
+    <div class="tiles">${TILES.map(t=>`<button class="tile" data-act="tile" data-l="${t[1]}"><span class="ti">${ICONS[t[0]]}</span><span class="tl">${t[1]}</span></button>`).join("")}</div>
+    <div class="sec" style="margin-top:18px">
+      <div class="head"><span class="gold cap">Company Database · Activity Feed</span><span class="right">LAST 24H</span></div>
+      <div>${FEED.map(f=>`<div class="act"><span class="t mono">${f.t}</span><span class="dot" style="background:var(--${f.tone});margin-top:5px"></span><span class="tag">${f.tag}</span><span class="m">${f.m}</span></div>`).join("")}</div>
+    </div>
+  </div>`;
+}
+
+function warView(){
+  const m=metrics();const occWidth=m.units?Math.round((m.occupied/m.units)*100):0;
+  const conv=state.conv.map(x=>`<div class="bub ${x.role==="user"?"me":"ai"}">${esc(x.content)}</div>`).join("");
+  return `
+  <div class="top">
+    <button class="btn-line" data-act="command" style="letter-spacing:.06em;padding:7px 9px;font-size:11px">← CMD</button>
+    ${dashBtn()}
+    <span class="brand" data-act="home">${ICONS.shield}<span class="cap">AMI</span></span>
+    <span class="badge b-nominal"><span class="dot" style="background:var(--green)"></span>NOMINAL</span>
+    <span class="badge b-live">((•)) LIVE</span>
+    <span class="clock mono" id="clock">${state.clock}</span>
+    ${themeBtn()}
+  </div>
+  <div class="wrap">
+    ${systemsStrip()}
+    <div style="text-align:center;margin-top:18px">
+      <div class="gold cap" style="font-size:12px;font-weight:600">Chairman’s Theatre</div>
+      <div class="serif gold" style="font-size:42px;font-weight:700;letter-spacing:.02em">WAR ROOM</div>
+      <div class="rule"></div>
+    </div>
+    <button class="btn-gold" style="margin-top:8px" data-act="brief">${ICONS.target} POSITION &nbsp;·&nbsp; CHIEF OF STAFF BRIEF</button>
+    <div class="sec">
+      <div class="head">${ICONS.spark}<span class="gold cap">Advisor</span><span class="right">${state.busy?"WORKING…":"IDLE"}</span></div>
+      ${conv?`<div class="msgs" id="msgs">${conv}</div>`:""}
+      <div class="adv-in"><input id="ask" placeholder="Ask the Chief of Staff…" /><button class="icbtn" data-act="voicein">${ICONS.mic}</button><button class="send" data-act="send">SEND</button></div>
+      <div class="comms">
+        <button class="wa" data-act="wa">↪ Send last reply via WhatsApp</button>
+        <button class="em" data-act="email">↪ Email last reply</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="head">${ICONS.dollar}<span class="gold cap">Cash Flow Situation</span><span class="right">LIVE</span></div>
+      <div class="cashrow"><div class="k">${ICONS.dollar} CURRENT POSITION</div><div class="v gold">${money(m.cash)}</div><div class="s">ACROSS ALL ACCOUNTS</div></div>
+      <div class="cashrow"><div class="k" style="color:var(--green)">${ICONS.up} INCOMING</div><div class="v" style="color:var(--green)">${money(m.incoming)}</div><div class="s">NEXT 7 DAYS</div></div>
+      <div class="cashrow"><div class="k" style="color:var(--red)">${ICONS.down} OUTGOING</div><div class="v" style="color:var(--red)">${money(m.outgoing)}</div><div class="s">NEXT 7 DAYS</div></div>
+    </div>
+    <div class="sec">
+      <div class="head">${ICONS.people}<span class="gold cap">Portfolio Occupancy</span><span class="right">${m.units} UNITS</span></div>
+      <div style="padding-top:16px"></div>
+      <div class="bar"><i style="width:${occWidth}%"></i></div>
+      <div class="occ-grid">
+        <div class="occ"><div class="l"><span class="dot" style="background:var(--green)"></span>OCCUPIED</div><div class="n" style="color:var(--green)">${m.occupied}</div></div>
+        <div class="occ"><div class="l"><span class="dot" style="background:var(--blue)"></span>LEASED</div><div class="n" style="color:var(--blue)">${m.leased}</div></div>
+        <div class="occ"><div class="l"><span class="dot" style="background:var(--amber)"></span>ACTIVE</div><div class="n" style="color:var(--amber)">${m.active}</div></div>
+        <div class="occ"><div class="l"><span class="dot" style="background:var(--red)"></span>VACANT</div><div class="n" style="color:var(--red)">${m.vacant}</div></div>
+        <div class="occ"><div class="l"><span class="dot" style="background:var(--purple)"></span>PENDING</div><div class="n" style="color:var(--purple)">${m.pending}</div></div>
+      </div>
+    </div>
+    <div class="eyebrow cap" style="margin-top:20px">Vaults</div>
+    <div class="vaults">
+      <div class="vault"><span class="vi">${ICONS.vault}</span><span><div class="vt">AMI VAULT</div><div class="vs">COMPANY DOCUMENTS</div></span></div>
+      <div class="vault"><span class="vi">${ICONS.lock}</span><span><div class="vt">PERSONAL VAULT</div><div class="vs">CHAIRMAN PRIVATE</div></span></div>
+    </div>
+    <div class="sec">
+      <div class="head">${ICONS.chat}<span class="gold cap">WhatsApp · Live</span><span class="right">TODAY</span></div>
+      <div class="wa-on">${ICONS.chat} WHATSAPP · LIVE <span class="dot blink" style="background:var(--green)"></span></div>
+      ${WA.map(w=>`<div class="feedline"><div class="feedhead"><span style="color:var(--${w.dir==="IN"?"green":"red"})">${w.dir} ${w.dir==="IN"?"▾":"▴"}</span><span class="muted mono">${w.t}</span><span class="gold">${w.who}</span></div><div class="feedmsg">${w.msg}</div></div>`).join("")}
+    </div>
+    <div class="sec">
+      <div class="head">${ICONS.bell}<span class="gold cap">Critical Alerts</span><span class="right">REAL-TIME</span></div>
+      <div class="body muted">No active alerts.</div>
+    </div>
+  </div>`;
+}
+
+function render(){
+  let body=state.view==="war"?warView():state.view==="home"?homeView():commandView();
+  if(!state.cfg.url && state.view==="command"){body=body.replace('<div class="wrap">','<div class="wrap"><div class="card" style="margin-top:14px;border-color:var(--gold)"><div class="pad"><div class="serif" style="font-size:18px">Connect your data</div><p class="note" style="margin-top:6px">Tap ⚙ and add your Supabase URL + anon key and Anthropic key. Until then values read $0 and the brief is offline.</p></div></div>');}
+  app.innerHTML=body;
+  const mm=document.getElementById("msgs"); if(mm)mm.scrollTop=mm.scrollHeight;
+}
+
+function pushMsg(role,content){state.conv.push({role,content});store.set("ami_conv",state.conv);const m=document.getElementById("msgs");if(m){const b=document.createElement("div");b.className="bub "+(role==="user"?"me":"ai");b.textContent=content;m.appendChild(b);m.scrollTop=m.scrollHeight}}
+async function send(text){const q=(text||"").trim();if(!q||state.busy)return;
+  if(!document.getElementById("msgs")){state.conv.push({role:"user",content:q});store.set("ami_conv",state.conv);render();}else pushMsg("user",q);
+  state.busy=true;const hd=document.querySelector(".sec .head .right");if(hd&&hd.textContent.indexOf("IDLE")>=0)hd.textContent="WORKING…";
+  try{const out=await callClaude(state.conv.map(x=>({role:x.role,content:x.content})),false);pushMsg("assistant",out);}
+  catch(e){pushMsg("assistant","⚠ "+e.message);}
+  finally{state.busy=false;const h=document.querySelector(".sec .head .right");if(h&&h.textContent==="WORKING…")h.textContent="IDLE";}}
+
+document.addEventListener("click",e=>{const el=e.target.closest("[data-act]");if(!el)return;const a=el.getAttribute("data-act");
+  if(a==="war"){state.view="war";render()}
+  else if(a==="command"){state.view="command";render()}
+  else if(a==="home"){state.view="home";render()}
+  else if(a==="company"){state.company=el.getAttribute("data-k");render()}
+  else if(a==="gocompany"){state.company=el.getAttribute("data-k");state.view="command";render()}
+  else if(a==="settings"){openSettings(true)}
+  else if(a==="closeSettings"){openSettings(false)}
+  else if(a==="save"){saveSettings()}
+  else if(a==="autopilot"){state.autopilot=!state.autopilot;render();toast(state.autopilot?"Autopilot engaged — approvals still required":"Autopilot on standby")}
+  else if(a==="brief"){generateBrief()}
+  else if(a==="listen"){listen()}
+  else if(a==="send"){const i=document.getElementById("ask");const v=i.value;i.value="";send(v)}
+  else if(a==="voicein"){startVoice()}
+  else if(a==="theme"){state.theme=state.theme==="day"?"night":"day";store.set("ami_theme",state.theme);applyTheme();render()}
+  else if(a==="wa"){sendVia("wa")}
+  else if(a==="email"){sendVia("email")}
+  else if(a==="tile"){const l=el.getAttribute("data-l");
+    if(l==="BRIEFS"){state.view="command";generateBrief()}
+    else if(l==="ADVISOR"||l==="COMMAND"){state.view="war";render();setTimeout(()=>{const i=document.getElementById("ask");if(i)i.focus()},60)}
+    else if(l==="ALERTS"){state.view="war";render()}
+    else toast(l.charAt(0)+l.slice(1).toLowerCase()+" — opens in the full build");}
+});
+document.addEventListener("keydown",e=>{if(e.key==="Enter"){const i=document.getElementById("ask");if(i&&document.activeElement===i){const v=i.value;i.value="";send(v)}}});
+
+function startVoice(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){toast("Voice input not supported here");return}const r=new SR();r.lang="en-US";r.onresult=ev=>{const t=ev.results[0][0].transcript;const i=document.getElementById("ask");if(i)i.value=t;send(t)};r.start();toast("Listening…")}
+function openSettings(s){const md=document.getElementById("settings");if(s){document.getElementById("cfgUrl").value=state.cfg.url;document.getElementById("cfgAnon").value=state.cfg.anon;document.getElementById("cfgKey").value=state.cfg.key;document.getElementById("cfgWa").value=state.cfg.wa||"";document.getElementById("cfgEmail").value=state.cfg.email||"";md.classList.add("show")}else md.classList.remove("show")}
+async function saveSettings(){state.cfg={url:document.getElementById("cfgUrl").value.trim(),anon:document.getElementById("cfgAnon").value.trim(),key:document.getElementById("cfgKey").value.trim(),wa:document.getElementById("cfgWa").value.trim(),email:document.getElementById("cfgEmail").value.trim()};store.set("ami_cfg",state.cfg);openSettings(false);toast("Connecting…");await loadSnapshot();render();}
+
+setInterval(()=>{state.clock=new Date().toLocaleTimeString("en-GB",{hour12:false});const c=document.getElementById("clock");if(c)c.textContent=state.clock},1000);
+(async function(){applyTheme();state.clock=new Date().toLocaleTimeString("en-GB",{hour12:false});if(state.cfg.url){await loadSnapshot()}render();})();
+</script>
+</body>
+</html>
