@@ -256,12 +256,13 @@ async function callClaude(messages,deep){
   if(!aiReady()) throw new Error("Connect Supabase in settings (⚙).");
   const url=state.cfg.url.replace(/\/$/,"")+"/functions/v1/ai";
   let res;
-  try{res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+state.cfg.anon,"apikey":state.cfg.anon},body:JSON.stringify({model:deep?MODEL_DEEP:MODEL_FAST,max_tokens:1400,system:SYSTEM+"\n\n## Live context\n"+aiContext(),messages})});}
+ try{res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","apikey":state.cfg.anon},body:JSON.stringify({model:deep?MODEL_DEEP:MODEL_FAST,max_tokens:1400,system:SYSTEM+"\n\n## Live context\n"+aiContext(),messages})});}
   catch(e){throw new Error("Can't reach the ai function. Check the Supabase URL and your connection.")}
   let data;
   try{data=await res.json()}
   catch(e){throw new Error("ai function returned non-JSON (HTTP "+res.status+"). Confirm it's deployed and Verify JWT is OFF.")}
-  if(res.status===401||res.status===426){throw new Error("ai function rejected the key (HTTP "+res.status+"). Turn OFF Verify JWT on the function — sb_publishable_ keys aren't JWTs.")}
+  if(res.status===401||res.status===426){throw new Ergithub 
+    ror("ai function rejected the key (HTTP "+res.status+"). Turn OFF Verify JWT on the function — sb_publishable_ keys aren't JWTs.")}
   if(!res.ok||data.error){throw new Error((data&&data.error&&(data.error.message||data.error))||("ai function error (HTTP "+res.status+")"))}
   return (data.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("\n")}
 
