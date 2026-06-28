@@ -115,7 +115,6 @@
   .act .t{font-size:12px;color:var(--muted);width:50px;flex:0 0 auto}
   .act .tag{border:1px solid var(--gold);color:var(--gold);font-size:10px;letter-spacing:.1em;padding:3px 7px;border-radius:3px;flex:0 0 auto}
   .act .m{font-size:14px}
-async function callClaudeMessages(messages,opts={}){const url=state.cfg.url.replace(/\/$/,"")+"/functions/v1/ai";const
   .adv-in{display:flex;gap:8px;padding:16px}
   .adv-in input{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:3px;color:var(--ink);padding:12px;outline:none;font-size:14px}
   .icbtn{border:1px solid var(--line);background:var(--panel2);border-radius:3px;width:48px;display:flex;align-items:center;justify-content:center;color:var(--gold)}
@@ -161,10 +160,9 @@ async function callClaudeMessages(messages,opts={}){const url=state.cfg.url.repl
 <div class="modal" id="settings">
   <div class="sheet">
     <div class="serif" style="font-size:20px">Connect AMI</div>
-    <p class="note" style="margin-top:6px">Stored only on this device. Your Anthropic key calls Claude directly from this page.</p>
+    <p class="note" style="margin-top:6px">Stored only on this device. AMI calls Claude through your Supabase <b style="color:var(--ink)">ai</b> function — your Anthropic key stays server-side and never touches this page.</p>
     <label>Supabase URL</label><input id="cfgUrl" placeholder="https://xxxx.supabase.co" />
-    <label>Supabase anon key</label><input id="cfgAnon" placeholder="eyJ..." />
-    <label>Anthropic API key</label><input id="cfgKey" placeholder="sk-ant-..." />
+    <label>Supabase anon key</label><input id="cfgAnon" placeholder="sb_publishable_… or eyJ…" />
     <label>Your WhatsApp number (intl, e.g. 231...)</label><input id="cfgWa" placeholder="231770022222" />
     <label>Your email (for send-as)</label><input id="cfgEmail" placeholder="you@example.com" />
     <button class="primary" data-act="save">Save &amp; connect</button>
@@ -229,10 +227,11 @@ const FEED=[
 const TILES=[["doc","BRIEFS"],["printer","REPORTS"],["check","APPROVALS"],["wallet","TREASURY"],["building","ASSETS"],["scale","LEGAL"],["shield","ADMIN"],["camera","CAPTURE"],["spark","ADVISOR"],["plane","COMMAND"],["bell","ALERTS"]];
 
 const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return (this._m[k]??d)}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){this._m[k]=v}},_m:{}};
-const state={view:"home",company:"group",cfg:store.get("ami_cfg",{url:"",anon:"",key:"",wa:"",email:""}),snap:emptySnap(),conv:store.get("ami_conv",[]),autopilot:false,brief:null,briefStatus:"idle",busy:false,clock:"",theme:store.get("ami_theme","night")};
+const state={view:"home",company:"group",cfg:store.get("ami_cfg",{url:"",anon:"",wa:"",email:""}),snap:emptySnap(),conv:store.get("ami_conv",[]),autopilot:false,brief:null,briefStatus:"idle",busy:false,clock:"",theme:store.get("ami_theme","night")};
 function emptySnap(){const s={};["leone","cape","lead","platinum"].forEach(k=>s[k]={entity:null,properties:[],units:[],tenants:[],bank_accounts:[],loans:[],receivables:[],payables:[]});return s}
 function money(n){return "$"+(Math.round((n||0)*100)/100).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
 function sum(rows,f){return (rows||[]).reduce((a,r)=>a+(Number(r&&r[f])||0),0)}
+function aiReady(){return !!state.cfg.url && !!state.cfg.anon}
 function sb(){if(!state.cfg.url||!state.cfg.anon)return null;try{return window.supabase.createClient(state.cfg.url,state.cfg.anon)}catch(e){return null}}
 
 async function loadSnapshot(){
@@ -254,11 +253,24 @@ function aiContext(){const lines=ENTITY_KEYS.map(k=>{const c=COMPANIES.find(x=>x
   return `- ${c.name}: cash ${money(sum(d.bank_accounts,"balance"))}, receivables ${money(sum(d.receivables,"amount"))}, payables ${money(sum(d.payables,"amount"))}, ${d.units.length} units, ${d.tenants.length} tenants.`});
   const where=state.view==="war"?"War Room (all four entities integrated)":`Command Center — ${COMPANIES.find(c=>c.key===state.company).name}`;
   return `Viewing: ${where}.\nEntities:\n${lines.join("\n")}`}
+
+// Claude is called through the Supabase Edge Function `ai` (server-side proxy).
+// The Anthropic key lives in Supabase secrets, NOT in this page.
+// NOTE: the `ai` function must have "Verify JWT" turned OFF, or sb_publishable_ anon keys return 401/426.
 async function callClaude(messages,deep){
-  if(!state.cfg.key) throw new Error("Add your Anthropic key in settings (⚙).");
-  const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":state.cfg.key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:deep?MODEL_DEEP:MODEL_FAST,max_tokens:1400,system:SYSTEM+"\n\n## Live context\n"+aiContext(),messages})});
-  const data=await res.json(); if(data.error) throw new Error(data.error.message||"AI error");
+  if(!aiReady()) throw new Error("Connect Supabase in settings (⚙).");
+  const url=state.cfg.url.replace(/\/$/,"")+"/functions/v1/ai";
+  let res;
+  try{
+    res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+state.cfg.anon,"apikey":state.cfg.anon},body:JSON.stringify({model:deep?MODEL_DEEP:MODEL_FAST,max_tokens:1400,system:SYSTEM+"\n\n## Live context\n"+aiContext(),messages})});
+  }catch(e){throw new Error("Can't reach the ai function. Check the Supabase URL and your connection.")}
+  let data;
+  try{data=await res.json()}
+  catch(e){throw new Error("ai function returned non-JSON (HTTP "+res.status+"). Confirm it's deployed and Verify JWT is OFF.")}
+  if(res.status===401||res.status===426){throw new Error("ai function rejected the key (HTTP "+res.status+"). Turn OFF Verify JWT on the function — sb_publishable_ keys aren't JWTs.")}
+  if(!res.ok||data.error){throw new Error((data&&data.error&&(data.error.message||data.error))||("ai function error (HTTP "+res.status+")"))}
   return (data.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("\n")}
+
 async function generateBrief(){state.briefStatus="loading";render();
   try{const txt=await callClaude([{role:"user",content:"Produce today's executive morning brief across all four entities: consolidated cash position, biggest receivables risk, payables due this week, and the 3 actions I should take today. 6 lines max."}],true);
     state.brief={text:txt,time:new Date().toLocaleTimeString("en-GB",{hour12:false}).slice(0,5),ok:true};state.briefStatus="ok";}
@@ -273,7 +285,7 @@ function applyTheme(){document.documentElement.setAttribute("data-theme",state.t
 function themeBtn(){return `<button class="gear" data-act="theme" title="Day / Night">${state.theme==="day"?"☀":"☾"}</button>`}
 function dashBtn(){return `<button class="btn-line" data-act="home" style="padding:6px 9px;font-size:11px;letter-spacing:.06em">⌂ DASH</button>`}
 function systemsStrip(){
-  const on=!!state.cfg.key, data=!!state.cfg.url;
+  const on=aiReady(), data=!!state.cfg.url;
   const lt=c=>`<span class="lt" style="background:var(--${c})"></span>`;
   return `<div class="sys">
     <span>${lt("green")}SYS NOMINAL</span>
@@ -294,7 +306,7 @@ function switcher(){return `<div class="switch">`+COMPANIES.map(c=>`<button clas
 function tileEl(lab,val,sub,color){return `<div class="panel" style="padding:14px"><div class="xs cap muted">${lab}</div><div class="serif" style="font-size:24px;margin-top:4px;color:${color}">${val}</div><div class="xs muted" style="margin-top:3px">${sub}</div></div>`}
 
 function homeView(){
-  const g=metrics("group"); const on=!!state.cfg.key;
+  const g=metrics("group"); const on=aiReady();
   return `
   <div class="top">
     <span class="brand">${ICONS.shield}<span class="cap">AMI</span></span>
@@ -346,7 +358,7 @@ function homeView(){
 }
 
 function commandView(){
-  const on=state.cfg.key && state.briefStatus!=="error";
+  const on=aiReady() && state.briefStatus!=="error";
   const briefBadge=state.briefStatus==="error"?`<span class="badge b-degraded">DEGRADED</span>`:state.briefStatus==="loading"?`<span class="badge b-degraded">WORKING…</span>`:`<span class="badge b-nominal">NOMINAL</span>`;
   const briefTitle=state.brief?(state.brief.ok?"Today’s brief ready":"Chief of Staff unreachable"):"No brief yet";
   const briefBody=state.brief?esc(state.brief.text):"Tap RE-BRIEF to generate today’s brief from your live data.";
@@ -465,7 +477,7 @@ function warView(){
 
 function render(){
   let body=state.view==="war"?warView():state.view==="home"?homeView():commandView();
-  if(!state.cfg.url && state.view==="command"){body=body.replace('<div class="wrap">','<div class="wrap"><div class="card" style="margin-top:14px;border-color:var(--gold)"><div class="pad"><div class="serif" style="font-size:18px">Connect your data</div><p class="note" style="margin-top:6px">Tap ⚙ and add your Supabase URL + anon key and Anthropic key. Until then values read $0 and the brief is offline.</p></div></div>');}
+  if(!state.cfg.url && state.view==="command"){body=body.replace('<div class="wrap">','<div class="wrap"><div class="card" style="margin-top:14px;border-color:var(--gold)"><div class="pad"><div class="serif" style="font-size:18px">Connect your data</div><p class="note" style="margin-top:6px">Tap ⚙ and add your Supabase URL + anon key. Until then values read $0 and the brief is offline.</p></div></div>');}
   app.innerHTML=body;
   const mm=document.getElementById("msgs"); if(mm)mm.scrollTop=mm.scrollHeight;
 }
@@ -504,8 +516,8 @@ document.addEventListener("click",e=>{const el=e.target.closest("[data-act]");if
 document.addEventListener("keydown",e=>{if(e.key==="Enter"){const i=document.getElementById("ask");if(i&&document.activeElement===i){const v=i.value;i.value="";send(v)}}});
 
 function startVoice(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){toast("Voice input not supported here");return}const r=new SR();r.lang="en-US";r.onresult=ev=>{const t=ev.results[0][0].transcript;const i=document.getElementById("ask");if(i)i.value=t;send(t)};r.start();toast("Listening…")}
-function openSettings(s){const md=document.getElementById("settings");if(s){document.getElementById("cfgUrl").value=state.cfg.url;document.getElementById("cfgAnon").value=state.cfg.anon;document.getElementById("cfgKey").value=state.cfg.key;document.getElementById("cfgWa").value=state.cfg.wa||"";document.getElementById("cfgEmail").value=state.cfg.email||"";md.classList.add("show")}else md.classList.remove("show")}
-async function saveSettings(){state.cfg={url:document.getElementById("cfgUrl").value.trim(),anon:document.getElementById("cfgAnon").value.trim(),key:document.getElementById("cfgKey").value.trim(),wa:document.getElementById("cfgWa").value.trim(),email:document.getElementById("cfgEmail").value.trim()};store.set("ami_cfg",state.cfg);openSettings(false);toast("Connecting…");await loadSnapshot();render();}
+function openSettings(s){const md=document.getElementById("settings");if(s){document.getElementById("cfgUrl").value=state.cfg.url;document.getElementById("cfgAnon").value=state.cfg.anon;document.getElementById("cfgWa").value=state.cfg.wa||"";document.getElementById("cfgEmail").value=state.cfg.email||"";md.classList.add("show")}else md.classList.remove("show")}
+async function saveSettings(){state.cfg={url:document.getElementById("cfgUrl").value.trim(),anon:document.getElementById("cfgAnon").value.trim(),wa:document.getElementById("cfgWa").value.trim(),email:document.getElementById("cfgEmail").value.trim()};store.set("ami_cfg",state.cfg);openSettings(false);toast("Connecting…");await loadSnapshot();render();}
 
 setInterval(()=>{state.clock=new Date().toLocaleTimeString("en-GB",{hour12:false});const c=document.getElementById("clock");if(c)c.textContent=state.clock},1000);
 (async function(){applyTheme();state.clock=new Date().toLocaleTimeString("en-GB",{hour12:false});if(state.cfg.url){await loadSnapshot()}render();})();
