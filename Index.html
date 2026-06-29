@@ -264,7 +264,7 @@ async function callClaude(messages,deep){
   if(res.status===401||res.status===426){throw new Ergithub 
     ror("ai function rejected the key (HTTP "+res.status+"). Turn OFF Verify JWT on the function — sb_publishable_ keys aren't JWTs.")}
   if(!res.ok||data.error){throw new Error((data&&data.error&&(data.error.message||data.error))||("ai function error (HTTP "+res.status+")"))}
-  return (data.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("\n")}
+  return (data.reply || (data.data && data.data.content || []).filter(c=>c.type==="text").map(c=>c.text).join("\n") || "(no reply)")}
 
 async function generateBrief(){state.briefStatus="loading";render();
   try{const txt=await callClaude([{role:"user",content:"Produce today's executive morning brief across all four entities: consolidated cash position, biggest receivables risk, payables due this week, and the 3 actions I should take today. 6 lines max."}],true);
