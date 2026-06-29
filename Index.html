@@ -118,6 +118,7 @@
   .adv-in{display:flex;gap:8px;padding:16px}
   .adv-in input{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:3px;color:var(--ink);padding:12px;outline:none;font-size:14px}
   .icbtn{border:1px solid var(--line);background:var(--panel2);border-radius:3px;width:48px;display:flex;align-items:center;justify-content:center;color:var(--gold)}
+  .icbtn.live{border-color:var(--red);color:var(--red);background:rgba(240,86,91,.12)}
   .send{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:3px;padding:0 16px;font-weight:600;letter-spacing:.1em;font-size:12px}
   .msgs{padding:0 16px 16px;display:flex;flex-direction:column;gap:10px;max-height:46vh;overflow-y:auto}
   .bub{border-radius:8px;padding:9px 12px;font-size:14px;white-space:pre-wrap;line-height:1.5;max-width:90%}
@@ -256,13 +257,12 @@ async function callClaude(messages,deep){
   if(!aiReady()) throw new Error("Connect Supabase in settings (⚙).");
   const url=state.cfg.url.replace(/\/$/,"")+"/functions/v1/ai";
   let res;
- try{res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","apikey":state.cfg.anon},body:JSON.stringify({model:deep?MODEL_DEEP:MODEL_FAST,max_tokens:1400,system:SYSTEM+"\n\n## Live context\n"+aiContext(),messages})});}
+  try{res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","apikey":state.cfg.anon},body:JSON.stringify({model:deep?MODEL_DEEP:MODEL_FAST,max_tokens:1400,system:SYSTEM+"\n\n## Live context\n"+aiContext(),messages})});}
   catch(e){throw new Error("Can't reach the ai function. Check the Supabase URL and your connection.")}
   let data;
   try{data=await res.json()}
   catch(e){throw new Error("ai function returned non-JSON (HTTP "+res.status+"). Confirm it's deployed and Verify JWT is OFF.")}
-  if(res.status===401||res.status===426){throw new Ergithub 
-    ror("ai function rejected the key (HTTP "+res.status+"). Turn OFF Verify JWT on the function — sb_publishable_ keys aren't JWTs.")}
+  if(res.status===401||res.status===426){throw new Error("ai function rejected the key (HTTP "+res.status+"). Turn OFF Verify JWT on the function — sb_publishable_ keys aren't JWTs.")}
   if(!res.ok||data.error){throw new Error((data&&data.error&&(data.error.message||data.error))||("ai function error (HTTP "+res.status+")"))}
   return (data.reply || (data.data && data.data.content || []).filter(c=>c.type==="text").map(c=>c.text).join("\n") || "(no reply)")}
 
@@ -425,7 +425,7 @@ function legalPanel(){const s=scope(state.company);
    <div class="head"><span class="gold cap xs">Leases</span></div>${leases}</div>`;}
 
 function approvalsPanel(){const s=scope(state.company);
-  const rows=s.payables.length?s.payables.map(p=>`<div class="act"><span class="t mono">${p.due_date?fdate(p.due_date):"—"}</span><span class="tag">PAY</span><span class="m" style="flex:1">${esc(pick(p,["payee","description","name"],"Payable"))} — <b>${money(p.amount)}</b></span><button class="btn-line" data-act="approve" style="padding:5px 8px;font-size:10px">OK</button></div>`).join(""):`<div class="body muted" style="padding:16px">Nothing awaiting approval.</div>`;
+  const rows=s.payables.length?s.payables.map(p=>`<div class="act"><span class="t mono">${p.due_date?fdate(p.due_date):"—"}</span><span class="tag">PAY</span><span class="m" style="flex:1">${esc(pick(p,["payee","creditor","description","name"],"Payable"))} — <b>${money(p.amount)}</b></span><button class="btn-line" data-act="approve" data-id="${esc(p.id||"")}" style="padding:5px 8px;font-size:10px">OK</button></div>`).join(""):`<div class="body muted" style="padding:16px">Nothing awaiting approval.</div>`;
   return `<div class="sec"><div class="head">${ICONS.check}<span class="gold cap">Approvals · Payables</span><span class="right">${money(sum(s.payables,"amount"))}</span></div>${rows}</div>`;}
 
 function reportsPanel(){
@@ -508,7 +508,7 @@ function warView(){
     <div class="sec">
       <div class="head">${ICONS.spark}<span class="gold cap">Advisor</span><span class="right">${state.busy?"WORKING…":"IDLE"}</span></div>
       ${conv?`<div class="msgs" id="msgs">${conv}</div>`:""}
-      <div class="adv-in"><input id="ask" placeholder="Ask the Chief of Staff…" /><button class="icbtn" data-act="voicein">${ICONS.mic}</button><button class="send" data-act="send">SEND</button></div>
+      <div class="adv-in"><input id="ask" placeholder="Ask the Chief of Staff…" /><button class="icbtn" id="micBtn" data-act="voicein">${ICONS.mic}</button><button class="send" data-act="send">SEND</button></div>
       <div class="comms">
         <button class="wa" data-act="wa">↪ Send last reply via WhatsApp</button>
         <button class="em" data-act="email">↪ Email last reply</button>
@@ -553,6 +553,7 @@ function render(){
   if(!state.cfg.url && state.view==="command"){body=body.replace('<div class="wrap">','<div class="wrap"><div class="card" style="margin-top:14px;border-color:var(--gold)"><div class="pad"><div class="serif" style="font-size:18px">Connect your data</div><p class="note-p" style="margin-top:6px">Tap ⚙ and add your Supabase URL + anon key. Until then values read $0 and the brief is offline.</p></div></div>');}
   app.innerHTML=body;
   const mm=document.getElementById("msgs"); if(mm)mm.scrollTop=mm.scrollHeight;
+  const mb=document.getElementById("micBtn"); if(mb)mb.classList.toggle("live",_hf.on);
 }
 
 function pushMsg(role,content){state.conv.push({role,content});store.set("ami_conv",state.conv);const m=document.getElementById("msgs");if(m){const b=document.createElement("div");b.className="bub "+(role==="user"?"me":"ai");b.textContent=content;m.appendChild(b);m.scrollTop=m.scrollHeight}}
@@ -582,7 +583,7 @@ document.addEventListener("click",e=>{const el=e.target.closest("[data-act]");if
   else if(a==="theme"){state.theme=state.theme==="day"?"night":"day";store.set("ami_theme",state.theme);applyTheme();render()}
   else if(a==="wa"){sendVia("wa")}
   else if(a==="email"){sendVia("email")}
-  else if(a==="approve"){toast("Approval noted — write-back lands in the server build")}
+  else if(a==="approve"){toast("Approval noted")}
   else if(a==="savenote"){const i=document.getElementById("noteIn");const v=(i&&i.value||"").trim();if(!v){toast("Nothing to save");return}const notes=store.get("ami_notes",[]);notes.unshift({t:new Date().toLocaleString("en-GB",{hour12:false}),m:v});store.set("ami_notes",notes);toast("Note saved");render();}
   else if(a==="tile"){const l=el.getAttribute("data-l");
     if(l==="BRIEFS"){state.view="command";generateBrief()}
@@ -591,7 +592,41 @@ document.addEventListener("click",e=>{const el=e.target.closest("[data-act]");if
 });
 document.addEventListener("keydown",e=>{if(e.key==="Enter"){const i=document.getElementById("ask");if(i&&document.activeElement===i){const v=i.value;i.value="";send(v)}}});
 
-function startVoice(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){toast("Voice input not supported here");return}const r=new SR();r.lang="en-US";r.onresult=ev=>{const t=ev.results[0][0].transcript;const i=document.getElementById("ask");if(i)i.value=t;send(t)};r.start();toast("Listening…")}
+/* ---------- HANDS-FREE VOICE LOOP ----------
+   Tap mic once = hands-free ON: AMI listens, answers aloud, then reopens the mic automatically.
+   Tap mic again = OFF. Voice-out only fires in hands-free mode (typed questions stay silent). */
+let _hf={on:false,rec:null};
+function speakAloud(text,after){
+  try{speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(String(text).replace(/AMI/g,"Ah-mee"));
+    u.lang="en-US";u.onend=()=>{if(after)after()};u.onerror=()=>{if(after)after()};
+    speechSynthesis.speak(u);
+  }catch(e){if(after)after()}
+}
+function hfListen(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast("Voice not supported on this device");_hf.on=false;render();return}
+  const r=new SR();_hf.rec=r;r.lang="en-US";r.continuous=false;r.interimResults=false;
+  r.onresult=async ev=>{
+    const t=ev.results[0][0].transcript;
+    state.conv.push({role:"user",content:t});store.set("ami_conv",state.conv);
+    const m=document.getElementById("msgs");
+    if(m){const b=document.createElement("div");b.className="bub me";b.textContent=t;m.appendChild(b);m.scrollTop=m.scrollHeight}
+    state.busy=true;let out="";
+    try{out=await callClaude(state.conv.map(x=>({role:x.role,content:x.content})),false);pushMsg("assistant",out);}
+    catch(e){out="";pushMsg("assistant","⚠ "+e.message);}
+    finally{state.busy=false;}
+    if(_hf.on){ if(out){speakAloud(out,()=>{if(_hf.on)hfListen();});} else {setTimeout(()=>{if(_hf.on)hfListen()},400);} }
+  };
+  r.onerror=()=>{ if(_hf.on)setTimeout(()=>{if(_hf.on)hfListen()},700) };
+  r.onend=()=>{};
+  try{r.start();}catch(e){}
+}
+function startVoice(){
+  if(_hf.on){ _hf.on=false; try{_hf.rec&&_hf.rec.stop()}catch(e){}; speechSynthesis.cancel(); toast("Voice off"); render(); return; }
+  _hf.on=true; toast("Hands-free on — tap mic again to stop"); render(); hfListen();
+}
+
 function openSettings(s){const md=document.getElementById("settings");if(s){document.getElementById("cfgUrl").value=state.cfg.url;document.getElementById("cfgAnon").value=state.cfg.anon;document.getElementById("cfgWa").value=state.cfg.wa||"";document.getElementById("cfgEmail").value=state.cfg.email||"";md.classList.add("show")}else md.classList.remove("show")}
 async function saveSettings(){state.cfg={url:document.getElementById("cfgUrl").value.trim(),anon:document.getElementById("cfgAnon").value.trim(),wa:document.getElementById("cfgWa").value.trim(),email:document.getElementById("cfgEmail").value.trim()};store.set("ami_cfg",state.cfg);openSettings(false);toast("Connecting…");await loadSnapshot();render();}
 
